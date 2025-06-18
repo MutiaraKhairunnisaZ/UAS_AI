@@ -1,0 +1,153 @@
+import tkinter as tk
+from tkinter import messagebox
+import heapq
+
+GRID_SIZE = 20
+CELL_SIZE = 30
+
+class Node:
+    def _init_(self, row, col):
+        self.row = row
+        self.col = col
+        self.g = float('inf')
+        self.h = 0
+        self.f = float('inf')
+        self.parent = None
+        self.state = "empty"  # empty, wall, start, goal, path, visited
+
+    def _lt_(self, other):
+        return self.f < other.f
+
+class AStarGUI:
+    def _init_(self, master):
+        self.master = master
+        self.grid = [[Node(r, c) for c in range(GRID_SIZE)] for r in range(GRID_SIZE)]
+        self.canvas = tk.Canvas(master, width=GRID_SIZE*CELL_SIZE, height=GRID_SIZE*CELL_SIZE)
+        self.canvas.pack()
+        self.start_node = None
+        self.goal_node = None
+        self.draw_grid()
+        self.canvas.bind("<Button-1>", self.on_click)
+
+        self.control_frame = tk.Frame(master)
+        self.control_frame.pack()
+        tk.Button(self.control_frame, text="Mulai", command=self.start_search).pack(side=tk.LEFT)
+        tk.Button(self.control_frame, text="Reset", command=self.reset_grid).pack(side=tk.LEFT)
+
+    def draw_grid(self):
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                x1 = c * CELL_SIZE
+                y1 = r * CELL_SIZE
+                x2 = x1 + CELL_SIZE
+                y2 = y1 + CELL_SIZE
+                color = self.get_color(self.grid[r][c].state)
+                self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="gray")
+
+    def redraw_cell(self, node):
+        x1 = node.col * CELL_SIZE
+        y1 = node.row * CELL_SIZE
+        x2 = x1 + CELL_SIZE
+        y2 = y1 + CELL_SIZE
+        color = self.get_color(node.state)
+        self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="gray")
+
+    def get_color(self, state):
+        return {
+            "empty": "white",
+            "wall": "black",
+            "start": "green",
+            "goal": "red",
+            "path": "yellow",
+            "visited": "skyblue"
+        }.get(state, "white")
+
+    def on_click(self, event):
+        row = event.y // CELL_SIZE
+        col = event.x // CELL_SIZE
+        node = self.grid[row][col]
+        if not self.start_node:
+            node.state = "start"
+            self.start_node = node
+        elif not self.goal_node and node != self.start_node:
+            node.state = "goal"
+            self.goal_node = node
+        elif node != self.start_node and node != self.goal_node:
+            node.state = "wall"
+        self.redraw_cell(node)
+
+    def reset_grid(self):
+        self.start_node = None
+        self.goal_node = None
+        for row in self.grid:
+            for node in row:
+                node.state = "empty"
+                node.g = float('inf')
+                node.f = float('inf')
+                node.parent = None
+                self.redraw_cell(node)
+
+    def neighbors(self, node):
+        directions = [(-1,0), (1,0), (0,-1), (0,1)]
+        result = []
+        for dr, dc in directions:
+            r, c = node.row + dr, node.col + dc
+            if 0 <= r < GRID_SIZE and 0 <= c < GRID_SIZE:
+                neighbor = self.grid[r][c]
+                if neighbor.state != "wall":
+                    result.append(neighbor)
+        return result
+
+    def heuristic(self, a, b):
+        return abs(a.row - b.row) + abs(a.col - b.col)
+
+    def start_search(self):
+        if not self.start_node or not self.goal_node:
+            messagebox.showwarning("Peringatan", "Tentukan titik START dan GOAL terlebih dahulu.")
+            return
+
+        for row in self.grid:
+            for node in row:
+                node.g = float('inf')
+                node.f = float('inf')
+                node.parent = None
+
+        open_list = []
+        self.start_node.g = 0
+        self.start_node.f = self.heuristic(self.start_node, self.goal_node)
+        heapq.heappush(open_list, self.start_node)
+
+        while open_list:
+            current = heapq.heappop(open_list)
+
+            if current == self.goal_node:
+                self.reconstruct_path(current)
+                return
+
+            if current != self.start_node:
+                current.state = "visited"
+                self.redraw_cell(current)
+
+            for neighbor in self.neighbors(current):
+                tentative_g = current.g + 1
+                if tentative_g < neighbor.g:
+                    neighbor.parent = current
+                    neighbor.g = tentative_g
+                    neighbor.f = tentative_g + self.heuristic(neighbor, self.goal_node)
+                    heapq.heappush(open_list, neighbor)
+
+        messagebox.showinfo("Info", "Tidak ada jalur ke tujuan.")
+
+    def reconstruct_path(self, current):
+        while current.parent and current != self.start_node:
+            current = current.parent
+            if current != self.start_node:
+                current.state = "path"
+                self.redraw_cell(current)
+
+# === RUN APP ===
+if _name_ == "_main_":
+    root = tk.Tk()
+    root.title("A* Pathfinding GUI - Klik Start & Goal")
+    app = AStarGUI(root)
+    root.mainloop()
