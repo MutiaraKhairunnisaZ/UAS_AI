@@ -1,0 +1,87 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# 1. Load data
+data = pd.read_csv("loan_data.csv")
+data = data[["Gender", "Married", "Education", "Self_Employed", "ApplicantIncome",
+             "LoanAmount", "Loan_Amount_Term", "Credit_History", "Loan_Status"]]
+data.dropna(inplace=True)
+
+# 2. Encode categorical data
+le = LabelEncoder()
+for col in ["Gender", "Married", "Education", "Self_Employed", "Loan_Status"]:
+    data[col] = le.fit_transform(data[col])
+
+# 3. Pisahkan fitur dan label
+X = data.drop("Loan_Status", axis=1)
+y = data["Loan_Status"]
+
+# 4. Normalisasi fitur numerik
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# 5. Split data
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.3, random_state=42)
+
+# 6. Train model SVM
+model = SVC(kernel="linear")
+model.fit(X_train, y_train)
+
+# 7. Evaluasi
+y_pred = model.predict(X_test)
+print("=== Evaluasi Model SVM ===")
+print("Akurasi:", accuracy_score(y_test, y_pred))
+print("\nLaporan Klasifikasi:\n", classification_report(y_test, y_pred))
+
+# === VISUALISASI ===
+plt.figure(figsize=(10, 6))
+sns.histplot(data=data, x="ApplicantIncome", hue="Loan_Status", bins=30, kde=True)
+plt.title("Distribusi Penghasilan vs Status Pinjaman")
+plt.xlabel("Pendapatan Pemohon")
+plt.ylabel("Jumlah")
+plt.tight_layout()
+plt.show()
+
+# === INPUT MANUAL PENGGUNA ===
+def input_user():
+    print("\nSilakan masukkan data peminjam:")
+    gender = input("Jenis Kelamin (Male/Female): ")
+    married = input("Status Menikah (Yes/No): ")
+    education = input("Pendidikan (Graduate/Not Graduate): ")
+    self_employed = input("Wirausaha? (Yes/No): ")
+    applicant_income = float(input("Penghasilan Pemohon: "))
+    loan_amount = float(input("Jumlah Pinjaman: "))
+    loan_term = float(input("Lama Pinjaman (dalam hari): "))
+    credit_history = float(input("Riwayat Kredit (1 untuk baik, 0 untuk buruk): "))
+
+    input_df = pd.DataFrame([{
+        "Gender": gender,
+        "Married": married,
+        "Education": education,
+        "Self_Employed": self_employed,
+        "ApplicantIncome": applicant_income,
+        "LoanAmount": loan_amount,
+        "Loan_Amount_Term": loan_term,
+        "Credit_History": credit_history
+    }])
+
+    for col in ["Gender", "Married", "Education", "Self_Employed"]:
+        input_df[col] = le.fit(data[col]).transform(input_df[col])
+
+    input_scaled = scaler.transform(input_df)
+    result = model.predict(input_scaled)[0]
+    status = "Disetujui" if result == 1 else "Ditolak"
+
+    print(f"\n✅ Hasil Prediksi: Pinjaman {status}")
+
+    input_df["Loan_Status_Prediction"] = status
+    input_df.to_csv("riwayat_prediksi_pinjaman.csv", mode='a', index=False, header=False)
+    print("📄 Hasil disimpan ke file: riwayat_prediksi_pinjaman.csv")
+
+# === JALANKAN INPUT MANUAL ===
+input_user()
